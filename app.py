@@ -11,7 +11,6 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
-
 # Initialize logging
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +40,20 @@ class FriendRequestManager:
         if accounts_dir.exists():
             return [f for f in accounts_dir.glob("*.json")]
         return []
+
+    def initialize_session_state():
+        if 'running' not in st.session_state:
+            st.session_state.running = False
+        if 'request_count' not in st.session_state:
+            st.session_state.request_count = 0
+        if 'total_attempts' not in st.session_state:
+            st.session_state.total_attempts = 0
+        if 'success_rate' not in st.session_state:
+            st.session_state.success_rate = "0%"
+        if 'elapsed_time' not in st.session_state:
+            st.session_state.elapsed_time = "0m 0s"
+        if 'should_stop' not in st.session_state:
+            st.session_state.should_stop = False
 
     async def get_auth_token(self, account: Account) -> Optional[str]:
         data = {
@@ -96,24 +109,18 @@ class FriendRequestManager:
             self.log(f"Error getting user ID: {str(e)}", "error")
             return None
 
-    # Add this to the FriendRequestManager class
+        # Add this to the FriendRequestManager class
     async def send_friend_request(self, friend_id: str, accounts: List[Account]):
-        while st.session_state.running:
+        while st.session_state.running and not st.session_state.should_stop:
             try:
-                # Check at the start of each loop if we should stop
-                if not st.session_state.running:
+                # Check if we should stop
+                if st.session_state.should_stop:
                     break
 
                 account = random.choice(accounts)
                 auth_token = await self.get_auth_token(account)
                 
-                # Check again after authentication
-                if not st.session_state.running:
-                    break
-
-                if not auth_token:
-                    self.log(f"Failed to get auth token for {account.display_name}", "error")
-                    st.rerun()
+                if not auth_token or st.session_state.should_stop:
                     continue
 
                 headers = {
@@ -121,18 +128,16 @@ class FriendRequestManager:
                     "Content-Type": "application/json"
                 }
                 
-                # Check before making request
-                if not st.session_state.running:
-                    break
-
                 async with aiohttp.ClientSession() as session:
-                    # Send friend request
+                    # Check again before making request
+                    if st.session_state.should_stop:
+                        break
+
                     async with session.post(
                         f"{self.friends_url}/friends/api/v1/{account.account_id}/friends/{friend_id}",
                         headers=headers
                     ) as response:
-                        # Check after request
-                        if not st.session_state.running:
+                        if st.session_state.should_stop:
                             break
 
                         if response.status == 204:
@@ -145,45 +150,37 @@ class FriendRequestManager:
                                     st.session_state.request_count += 1
                                     self.log(f"Friend request cycle completed with {account.display_name} ({st.session_state.request_count} total)", "success")
                                     self.update_stats()
-                                    st.rerun()
                         elif response.status == 429:
                             data = await response.json()
                             wait_time = data.get('messageVars', [30])[0]
                             self.log(f"Rate limited. Waiting {wait_time} seconds", "warning")
-                            st.rerun()
                             
-                            # Break up the sleep into smaller chunks to check for stop
+                            # Break up the wait time to check for stop
                             for _ in range(int(wait_time)):
-                                if not st.session_state.running:
+                                if st.session_state.should_stop:
                                     break
                                 await asyncio.sleep(1)
                         else:
                             response_text = await response.text()
                             self.log(f"Request failed: {response_text}", "error")
-                            st.rerun()
 
-                # Check before delay
-                if not st.session_state.running:
-                    break
-
-                # Break up the sleep into smaller chunks
+                # Break up the delay to check for stop
                 for _ in range(3):  # 3 seconds delay
-                    if not st.session_state.running:
+                    if st.session_state.should_stop:
                         break
                     await asyncio.sleep(1)
 
             except Exception as e:
                 self.log(f"Error in friend request cycle: {str(e)}", "error")
-                st.rerun()
-                
-                # Check before error delay
-                if not st.session_state.running:
+                if st.session_state.should_stop:
                     break
                 await asyncio.sleep(5)
 
-        # Final cleanup when stopped
-        self.log("Process stopped", "warning")
-        st.rerun()
+        # Clean up when stopped
+        if st.session_state.should_stop:
+            self.log("Process stopped completely", "warning")
+            st.session_state.running = False
+            st.session_state.should_stop = False
 
     def log(self, message: str, level: str = "info"):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -563,12 +560,12 @@ def main():
                         st.error(f"Error starting process: {str(e)}")
         
         # Show stop button only if running
-        if st.session_state.get('running', False):
+        if st.session_state.running:
             if st.button("Stop Process", type="secondary", use_container_width=True):
+                st.session_state.should_stop = True
                 st.session_state.running = False
-                manager.log("Process stopped", "warning")
-                time.sleep(0.1)  # Small delay to ensure final log message
-                st.experimental_rerun()
+                manager.log("Stopping all requests...", "warning")
+                time.sleep(0.1)  # Small delay to ensure message is shown
 
         # Stats
         st.header("Statistics")
