@@ -194,6 +194,10 @@ class FriendRequestManager:
         # Keep only last 100 messages
         if len(st.session_state.log) > 100:
             st.session_state.log = st.session_state.log[-100:]
+        
+        # Force immediate update of displays
+        if hasattr(st.session_state, 'update_displays'):
+            st.session_state.update_displays()
 
     def update_stats(self):
         if 'start_time' in st.session_state:
@@ -229,271 +233,35 @@ async def run_friend_requests(manager: FriendRequestManager, accounts: List[Acco
 def main():
     st.set_page_config(page_title="Friend Request Manager", page_icon="🤝", layout="wide")
     
-    # Add this at the beginning of your friend_spammer.py
-
-    # Custom CSS with modern design
-    st.markdown("""
-    <style>
-        /* Modern color scheme */
-        :root {
-            --primary: #4f46e5;
-            --secondary: #3b82f6;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --error: #ef4444;
-            --background: #0f172a;
-            --card: #1e293b;
-            --text: #f8fafc;
-        }
-
-        /* Main container and background */
-        .stApp {
-            background: linear-gradient(145deg, var(--background), #1e1b4b);
-        }
-
-        /* Sidebar styling */
-        section[data-testid="stSidebar"] {
-            background-color: var(--card);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        section[data-testid="stSidebar"] .block-container {
-            padding-top: 2rem;
-        }
-
-        /* Headers */
-        h1, h2, h3 {
-            color: var(--text) !important;
-            font-weight: 600 !important;
-            letter-spacing: -0.5px !important;
-        }
-
-        /* Metrics styling */
-        [data-testid="stMetric"] {
-            background: var(--card);
-            padding: 1rem;
-            border-radius: 0.75rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
-                        0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            transition: transform 0.2s ease;
-        }
-
-        [data-testid="stMetric"]:hover {
-            transform: translateY(-2px);
-        }
-
-        [data-testid="stMetricValue"] {
-            color: var(--primary) !important;
-            font-size: 2rem !important;
-            font-weight: 700 !important;
-        }
-
-        [data-testid="stMetricLabel"] {
-            color: rgba(255, 255, 255, 0.6) !important;
-        }
-
-        /* Button styling */
-        .stButton button {
-            width: 100%;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            border: none;
-        }
-
-        .stButton button:first-child {
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
-            color: white;
-        }
-
-        .stButton button:first-child:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
-        }
-
-        .stButton button[kind="secondary"] {
-            background: var(--error);
-            color: white;
-        }
-
-        .stButton button[kind="secondary"]:hover {
-            background: #dc2626;
-            transform: translateY(-2px);
-        }
-
-        /* File uploader */
-        [data-testid="stFileUploader"] {
-            background: var(--card);
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            border: 2px dashed rgba(255, 255, 255, 0.2);
-        }
-
-        [data-testid="stFileUploader"]:hover {
-            border-color: var(--primary);
-        }
-
-        /* Input fields */
-        .stTextInput input {
-            background: var(--card);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.75rem;
-            padding: 0.75rem 1rem;
-            color: var(--text);
-        }
-
-        .stTextInput input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
-        }
-
-        /* Log container */
-        pre {
-            background: var(--card) !important;
-            border-radius: 0.75rem !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            padding: 1rem !important;
-            max-height: 400px !important;
-            overflow-y: auto !important;
-        }
-
-        code {
-            color: var(--text) !important;
-            font-family: 'JetBrains Mono', monospace !important;
-        }
-
-        /* Success/Error messages */
-        .success {
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid var(--success);
-            color: var(--success);
-            margin: 0.5rem 0;
-        }
-
-        .error {
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--error);
-            color: var(--error);
-            margin: 0.5rem 0;
-        }
-
-        /* Scrollbar styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--card);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* Loading animation */
-        .stProgress > div > div > div {
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
-        }
-
-        /* Divider */
-        hr {
-            border: none;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent, 
-                rgba(255, 255, 255, 0.1), 
-                transparent
-            );
-            margin: 2rem 0;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <style>
-        /* File uploader styling */
-        [data-testid="stFileUploader"] {
-            background: var(--card);
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            border: 2px dashed rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-        }
-
-        [data-testid="stFileUploader"]:hover {
-            border-color: var(--primary);
-            background: rgba(79, 70, 229, 0.1);
-        }
-
-        /* Tab styling */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            background-color: transparent;
-        }
-
-        .stTabs [data-baseweb="tab"] {
-            background-color: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.5rem;
-            color: var(--text);
-            padding: 0.5rem 1rem;
-        }
-
-        .stTabs [data-baseweb="tab"]:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .stTabs [aria-selected="true"] {
-            background-color: var(--primary) !important;
-            border-color: var(--primary) !important;
-        }
-
-        /* Selectbox styling */
-        [data-baseweb="select"] {
-            background-color: var(--card);
-            border-radius: 0.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        [data-baseweb="select"]:hover {
-            border-color: var(--primary);
-        }
-
-        [data-baseweb="popover"] {
-            background-color: var(--card);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.5rem;
-        }
-
-        [data-baseweb="option"] {
-            background-color: transparent;
-        }
-
-        [data-baseweb="option"]:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-    </style>
-    """, unsafe_allow_html=True)
-    
     # Initialize session state
     initialize_session_state()
     
     manager = FriendRequestManager()
 
     st.title("Friend Request Manager")
+
+    # Create placeholders for live updates
+    stats_container = st.empty()
+    log_container = st.empty()
+
+    # Function to update stats
+    def update_stats():
+        with stats_container.container():
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Requests", st.session_state.get('request_count', 0))
+            with col2:
+                st.metric("Success Rate", st.session_state.get('success_rate', '0%'))
+            with col3:
+                if st.session_state.get('running', False):
+                    elapsed = time.time() - st.session_state.get('start_time', time.time())
+                    st.session_state.elapsed_time = f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
+                st.metric("Active Time", st.session_state.elapsed_time)
+
+    # Function to update log
+    def update_log():
+        if 'log' in st.session_state:
+            log_container.code("\n".join(st.session_state.log))
 
     # Sidebar
     with st.sidebar:
@@ -551,7 +319,7 @@ def main():
                         
                         # Reset all session state
                         st.session_state.running = True
-                        st.session_state.should_stop = False  # Reset stop flag
+                        st.session_state.should_stop = False
                         st.session_state.start_time = time.time()
                         st.session_state.accounts = accounts
                         st.session_state.target_name = target_name
@@ -562,43 +330,23 @@ def main():
                         st.session_state.log = []
                         
                         manager.log(f"Loaded {len(accounts)} accounts", "success")
-                        st.rerun()
                         
                     except Exception as e:
                         st.error(f"Error starting process: {str(e)}")
         
-    if st.session_state.running:
-        if st.button("Stop Process", type="secondary", use_container_width=True):
-            st.session_state.should_stop = True
-            st.session_state.running = False
-            manager.log("Stopping process...", "warning")
-            time.sleep(0.1)  # Small delay to ensure message is shown
-            st.rerun()
+        # Show stop button only if running
+        if st.session_state.running:
+            if st.button("Stop Process", type="secondary", use_container_width=True):
+                st.session_state.should_stop = True
+                st.session_state.running = False
+                manager.log("Stopping process...", "warning")
 
-        # Stats
-        st.header("Statistics")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total Requests", st.session_state.get('request_count', 0))
-        with col2:
-            st.metric("Success Rate", st.session_state.get('success_rate', '0%'))
-        
-        if st.session_state.get('running', False):
-            elapsed = time.time() - st.session_state.get('start_time', time.time())
-            st.session_state.elapsed_time = f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
-        st.metric("Active Time", st.session_state.get('elapsed_time', '0m 0s'))
-
-    # Log container
-    st.markdown("### Process Log")
-    log_container = st.empty()
-    
-    # Display logs
-    if 'log' in st.session_state:
-        log_text = "\n".join(st.session_state.log)
-        log_container.code(log_text)
+    # Initial stats and log display
+    update_stats()
+    update_log()
 
     # Run the friend request process
-    if st.session_state.get('running', False) and 'accounts' in st.session_state and 'target_name' in st.session_state:
+    if st.session_state.running and 'accounts' in st.session_state and 'target_name' in st.session_state:
         try:
             # Get target ID first
             first_account = st.session_state.accounts[0]
@@ -607,23 +355,34 @@ def main():
             if auth_token:
                 target_id = asyncio.run(manager.get_user_id(st.session_state.target_name, auth_token))
                 if target_id:
-                    asyncio.run(run_friend_requests(manager, st.session_state.accounts, target_id))
+                    while st.session_state.running and not st.session_state.should_stop:
+                        # Update displays
+                        update_stats()
+                        update_log()
+                        
+                        # Run friend requests
+                        asyncio.run(run_friend_requests(manager, st.session_state.accounts, target_id))
+                        
+                        # Small delay to prevent excessive updates
+                        time.sleep(0.1)
                 else:
                     st.error("Could not find target user")
                     st.session_state.running = False
                     manager.log("Could not find target user", "error")
-                    st.rerun()
             else:
                 st.error("Failed to authenticate")
                 st.session_state.running = False
                 manager.log("Failed to authenticate", "error")
-                st.rerun()
                 
         except Exception as e:
             st.error(f"Error in friend request process: {str(e)}")
             st.session_state.running = False
             manager.log(f"Error in friend request process: {str(e)}", "error")
-            st.rerun()
+
+    # Final update after stopping
+    if not st.session_state.running:
+        update_stats()
+        update_log()
 
 if __name__ == "__main__":
     main()
