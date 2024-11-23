@@ -52,7 +52,7 @@ class FriendRequestManager:
             st.session_state.success_rate = "0%"
         if 'elapsed_time' not in st.session_state:
             st.session_state.elapsed_time = "0m 0s"
-        if 'should_stop' not in st.session_state:
+        if 'should_stop' not in st.session_state:  # Add this
             st.session_state.should_stop = False
 
     async def get_auth_token(self, account: Account) -> Optional[str]:
@@ -113,7 +113,6 @@ class FriendRequestManager:
     async def send_friend_request(self, friend_id: str, accounts: List[Account]):
         while st.session_state.running and not st.session_state.should_stop:
             try:
-                # Check if we should stop
                 if st.session_state.should_stop:
                     break
 
@@ -129,7 +128,6 @@ class FriendRequestManager:
                 }
                 
                 async with aiohttp.ClientSession() as session:
-                    # Check again before making request
                     if st.session_state.should_stop:
                         break
 
@@ -141,7 +139,6 @@ class FriendRequestManager:
                             break
 
                         if response.status == 204:
-                            # Delete friend request
                             async with session.delete(
                                 f"{self.friends_url}/friends/api/v1/{account.account_id}/friends/{friend_id}",
                                 headers=headers
@@ -155,7 +152,7 @@ class FriendRequestManager:
                             wait_time = data.get('messageVars', [30])[0]
                             self.log(f"Rate limited. Waiting {wait_time} seconds", "warning")
                             
-                            # Break up the wait time to check for stop
+                            # Break up the wait time
                             for _ in range(int(wait_time)):
                                 if st.session_state.should_stop:
                                     break
@@ -164,8 +161,11 @@ class FriendRequestManager:
                             response_text = await response.text()
                             self.log(f"Request failed: {response_text}", "error")
 
-                # Break up the delay to check for stop
-                for _ in range(3):  # 3 seconds delay
+                if st.session_state.should_stop:
+                    break
+
+                # Break up the delay
+                for _ in range(3):
                     if st.session_state.should_stop:
                         break
                     await asyncio.sleep(1)
@@ -559,13 +559,13 @@ def main():
                     except Exception as e:
                         st.error(f"Error starting process: {str(e)}")
         
-        # Show stop button only if running
+        # In the sidebar section of main()
         if st.session_state.running:
             if st.button("Stop Process", type="secondary", use_container_width=True):
                 st.session_state.should_stop = True
                 st.session_state.running = False
-                manager.log("Stopping all requests...", "warning")
-                time.sleep(0.1)  # Small delay to ensure message is shown
+                manager.log("Stopping process...", "warning")
+                # Remove the experimental_rerun() call
 
         # Stats
         st.header("Statistics")
