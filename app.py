@@ -205,16 +205,23 @@ class FriendRequestManager:
             st.session_state.success_rate = f"{success_rate:.1f}%"
 
 def initialize_session_state():
-    if 'running' not in st.session_state:
-        st.session_state.running = False
-    if 'request_count' not in st.session_state:
-        st.session_state.request_count = 0
-    if 'total_attempts' not in st.session_state:
-        st.session_state.total_attempts = 0
-    if 'success_rate' not in st.session_state:
-        st.session_state.success_rate = "0%"
-    if 'elapsed_time' not in st.session_state:
-        st.session_state.elapsed_time = "0m 0s"
+    """Initialize all session state variables"""
+    defaults = {
+        'running': False,
+        'request_count': 0,
+        'total_attempts': 0,
+        'success_rate': "0%",
+        'elapsed_time': "0m 0s",
+        'should_stop': False,
+        'log': [],
+        'accounts': None,
+        'target_name': None,
+        'start_time': None
+    }
+    
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 async def run_friend_requests(manager: FriendRequestManager, accounts: List[Account], friend_id: str):
     await manager.send_friend_request(friend_id, accounts)
@@ -544,6 +551,7 @@ def main():
                         
                         # Reset all session state
                         st.session_state.running = True
+                        st.session_state.should_stop = False  # Reset stop flag
                         st.session_state.start_time = time.time()
                         st.session_state.accounts = accounts
                         st.session_state.target_name = target_name
@@ -554,18 +562,18 @@ def main():
                         st.session_state.log = []
                         
                         manager.log(f"Loaded {len(accounts)} accounts", "success")
-                        st.experimental_rerun()
+                        st.rerun()
                         
                     except Exception as e:
                         st.error(f"Error starting process: {str(e)}")
         
-        # In the sidebar section of main()
-        if st.session_state.running:
-            if st.button("Stop Process", type="secondary", use_container_width=True):
-                st.session_state.should_stop = True
-                st.session_state.running = False
-                manager.log("Stopping process...", "warning")
-                # Remove the experimental_rerun() call
+    if st.session_state.running:
+        if st.button("Stop Process", type="secondary", use_container_width=True):
+            st.session_state.should_stop = True
+            st.session_state.running = False
+            manager.log("Stopping process...", "warning")
+            time.sleep(0.1)  # Small delay to ensure message is shown
+            st.rerun()
 
         # Stats
         st.header("Statistics")
@@ -604,18 +612,18 @@ def main():
                     st.error("Could not find target user")
                     st.session_state.running = False
                     manager.log("Could not find target user", "error")
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 st.error("Failed to authenticate")
                 st.session_state.running = False
                 manager.log("Failed to authenticate", "error")
-                st.experimental_rerun()
+                st.rerun()
                 
         except Exception as e:
             st.error(f"Error in friend request process: {str(e)}")
             st.session_state.running = False
             manager.log(f"Error in friend request process: {str(e)}", "error")
-            st.experimental_rerun()
+            st.rerun()
 
 if __name__ == "__main__":
     main()
