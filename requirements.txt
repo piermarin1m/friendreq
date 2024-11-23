@@ -8,3 +8,4 @@ typing>=3.7.4.3
 dataclasses>=0.6
 nest-asyncio>=1.5.8 
 httpx
+pyperclip
